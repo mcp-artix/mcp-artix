@@ -147,3 +147,5 @@ Cuando exista acceso:
 - [ ] protección de `develop` y `main` activa
 - [ ] entornos `qa` y `prod` creados con revisión manual
 - [ ] secretos definidos fuera del repositorio
+- Prueba de protección de ramas
+- Prueba de protección de ramas
