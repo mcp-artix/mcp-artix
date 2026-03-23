@@ -1,0 +1,73 @@
+name: Validate (Puente GitHub)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "bugfix/**"
+      - "hotfix/**"
+      - "release/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validar convenciones y build MCP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            mcp/oracle-apex/package-lock.json
+            mcp/glpi/package-lock.json
+
+      - name: Preparar parámetros de validación
+        id: parametros
+        run: |
+          BRANCH_NAME="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          COMMIT_RANGE=""
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            COMMIT_RANGE="${BASE_SHA}..${HEAD_SHA}"
+          else
+            BEFORE_SHA="${{ github.event.before }}"
+            ZERO_SHA="0000000000000000000000000000000000000000"
+            if [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "${ZERO_SHA}" ]]; then
+              COMMIT_RANGE="${BEFORE_SHA}..${GITHUB_SHA}"
+            fi
+          fi
+
+          echo "branch_name=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
+          echo "commit_range=${COMMIT_RANGE}" >> "$GITHUB_OUTPUT"
+          echo "Rama a validar: ${BRANCH_NAME}"
+          if [[ -n "${COMMIT_RANGE}" ]]; then
+            echo "Rango de commits a validar: ${COMMIT_RANGE}"
+          else
+            echo "Rango de commits no definido; se validará commit HEAD."
+          fi
+
+      - name: Ejecutar validate local (modo CI)
+        run: |
+          BRANCH_NAME="${{ steps.parametros.outputs.branch_name }}"
+          COMMIT_RANGE="${{ steps.parametros.outputs.commit_range }}"
+          if [[ -n "$COMMIT_RANGE" ]]; then
+            bash ci/scripts/validate-local.sh --branch "$BRANCH_NAME" --commit-range "$COMMIT_RANGE"
+          else
+            bash ci/scripts/validate-local.sh --branch "$BRANCH_NAME"
+          fi

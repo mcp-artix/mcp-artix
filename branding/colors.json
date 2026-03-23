@@ -1,0 +1,29 @@
+{
+  "comentario": "Valores de ejemplo para laboratorio. Sustituir por paleta institucional oficial.",
+  "primario": {
+    "nombre": "Azul institucional (ejemplo)",
+    "hex": "#1B4F72"
+  },
+  "secundario": {
+    "nombre": "Gris apoyo",
+    "hex": "#566573"
+  },
+  "acento": {
+    "nombre": "Acento CTA",
+    "hex": "#148F77"
+  },
+  "fondo": {
+    "claro": "#F4F6F7",
+    "oscuro": "#1C2833"
+  },
+  "texto": {
+    "principal": "#212F3D",
+    "inverso": "#F8F9F9"
+  },
+  "estado": {
+    "exito": "#1E8449",
+    "advertencia": "#D68910",
+    "error": "#C0392B",
+    "informacion": "#2874A6"
+  }
+}

@@ -1,0 +1,21 @@
+# Ejemplo de override local (Mac / ajustes de equipo).
+# Copiar a docker-compose.override.yml (no versionar) junto a docker-compose.yml:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#
+# Docker Compose fusiona automáticamente override.yml si existe.
+
+services:
+  oracle:
+    # Forzar plataforma si hay problemas de arquitectura:
+    # platform: linux/amd64
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+
+  gitlab:
+    platform: linux/amd64
+    deploy:
+      resources:
+        limits:
+          memory: 8G

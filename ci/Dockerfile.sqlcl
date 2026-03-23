@@ -1,0 +1,12 @@
+# PLANTILLA — Imagen CI con SQLcl para job export_apex.
+# Construya una imagen corporativa que incluya SQLcl bajo licencia Oracle aceptada,
+# o monte el binario en el Runner. Este Dockerfile NO descarga Oracle por defecto.
+#
+# Ejemplo de uso en .gitlab-ci.yml:
+#   export_apex:
+#     image: $CI_REGISTRY_IMAGE/sqlcl-ci:1.0
+#
+FROM alpine:3.19
+RUN echo "Sustituir por imagen base con Java + SQLcl o usar imagen interna aprobada." > /README-SQLCL.txt
+WORKDIR /workspace
+CMD ["cat", "/README-SQLCL.txt"]

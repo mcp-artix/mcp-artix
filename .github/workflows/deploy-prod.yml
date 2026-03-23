@@ -1,0 +1,48 @@
+name: Deploy PROD (Manual Puente)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o tag a desplegar (debe ser main)"
+        required: true
+        default: "main"
+      glpi_ticket:
+        description: "ID de ticket GLPI (solo número)"
+        required: true
+      aprobador_cambio:
+        description: "Nombre o usuario del aprobador de cambio"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy_prod:
+    name: Gate manual PROD
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    steps:
+      - name: Validar referencia permitida para PROD
+        run: |
+          REF_INPUT="${{ github.event.inputs.ref }}"
+          if [[ "$REF_INPUT" == "main" ]]; then
+            echo "Referencia válida para PROD: $REF_INPUT"
+            exit 0
+          fi
+          echo "Referencia no permitida para PROD: $REF_INPUT"
+          echo "Solo se admite main en este gate."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Registro de gate PROD
+        run: |
+          echo "Gate manual PROD aprobado para ref: ${{ github.event.inputs.ref }}"
+          echo "Ticket GLPI: GLPI-${{ github.event.inputs.glpi_ticket }}"
+          echo "Aprobador registrado: ${{ github.event.inputs.aprobador_cambio }}"
+          echo "Pendiente de iteraciones posteriores: integrar despliegue real con doble control."

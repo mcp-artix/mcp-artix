@@ -1,0 +1,149 @@
+# Plataforma empornac-ai-dev-platform — Compose maestro (laboratorio)
+# Uso: desde esta carpeta → cp .env.example .env && docker compose up -d
+#
+# Perfiles:
+#   (sin perfil) — núcleo: oracle, mariadb, glpi
+#   gitlab       — GitLab CE (pesado; puede requerir platform: linux/amd64 en Apple Silicon)
+#   runner       — GitLab Runner con socket Docker
+#   mcp          — construye imágenes MCP (opcional; muchos clientes MCP usan stdio en host)
+#
+# ORDS no está como servicio listo: ver docs/instalacion/02-apex-y-ords.md e infra/ords/README.md
+
+name: empornac-lab
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:latest
+    container_name: empornac-oracle
+    hostname: oracle
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+      - "${ORACLE_HTTP_PORT:-8080}:8080"
+    environment:
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?definir ORACLE_PASSWORD en .env}"
+      ORACLE_DATABASE: "${ORACLE_DATABASE:-FREEPDB1}"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    networks:
+      - empornac_internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 300s
+
+  mariadb:
+    image: mariadb:11
+    container_name: empornac-mariadb
+    hostname: mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:?definir MARIADB_ROOT_PASSWORD}"
+      MARIADB_DATABASE: "${MARIADB_DATABASE:-glpi}"
+      MARIADB_USER: "${MARIADB_USER:-glpi}"
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:?definir MARIADB_PASSWORD}"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - empornac_internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  glpi:
+    image: "diouxx/glpi:${GLPI_IMAGE_TAG:-latest}"
+    container_name: empornac-glpi
+    hostname: glpi
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "${GLPI_HTTP_PORT:-8081}:80"
+    environment:
+      TIMEZONE: America/Guatemala
+      GLPI_DB_HOST: mariadb
+      GLPI_DB_NAME: "${MARIADB_DATABASE:-glpi}"
+      GLPI_DB_USER: "${MARIADB_USER:-glpi}"
+      GLPI_DB_PASSWORD: "${MARIADB_PASSWORD:?definir MARIADB_PASSWORD}"
+    networks:
+      - empornac_internal
+
+  gitlab:
+    profiles: ["gitlab"]
+    image: gitlab/gitlab-ce:latest
+    container_name: empornac-gitlab
+    hostname: gitlab
+    # Descomentar en Apple Silicon si la imagen solo está en amd64:
+    # platform: linux/amd64
+    ports:
+      - "${GITLAB_HTTP_PORT:-8929}:80"
+      - "${GITLAB_SSH_PORT:-2222}:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '${GITLAB_OMNIBUS_CONFIG_EXTERNAL_URL:-http://localhost:8929}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PORT:-2222}
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - empornac_internal
+
+  gitlab-runner:
+    profiles: ["runner"]
+    image: gitlab/gitlab-runner:alpine
+    container_name: empornac-gitlab-runner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab_runner_config:/etc/gitlab-runner
+    networks:
+      - empornac_internal
+
+  mcp-oracle-apex:
+    profiles: ["mcp"]
+    build:
+      context: ../mcp/oracle-apex
+      dockerfile: Dockerfile
+    image: empornac/mcp-oracle-apex:local
+    container_name: empornac-mcp-oracle-apex
+    environment:
+      # Definir en .env si usa el perfil mcp; no dejar cadena con contraseña en el repositorio.
+      # En contenedor use host "oracle" (red Docker), no "localhost".
+      ORACLE_CONNECTION: "${ORACLE_CONNECTION_MCP:-}"
+    networks:
+      - empornac_internal
+    # Sin puerto por defecto: MCP suele usar stdio; ver mcp/oracle-apex/README.md
+    stdin_open: true
+    tty: true
+
+  mcp-glpi:
+    profiles: ["mcp"]
+    build:
+      context: ../mcp/glpi
+      dockerfile: Dockerfile
+    image: empornac/mcp-glpi:local
+    container_name: empornac-mcp-glpi
+    environment:
+      # Para contenedor MCP use URL interna de Docker (por defecto http://glpi).
+      GLPI_BASE_URL: "${GLPI_API_URL_MCP:-http://glpi}"
+      GLPI_APP_TOKEN: "${GLPI_API_TOKEN:-}"
+      GLPI_USER_TOKEN: "${GLPI_USER_TOKEN:-}"
+    networks:
+      - empornac_internal
+    stdin_open: true
+    tty: true
+
+networks:
+  empornac_internal:
+    driver: bridge
+
+volumes:
+  oracle_data:
+  mariadb_data:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+  gitlab_runner_config:

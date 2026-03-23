@@ -1,0 +1,44 @@
+name: Deploy QA (Manual Puente)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o tag a desplegar (develop o release/*)"
+        required: true
+        default: "develop"
+      glpi_ticket:
+        description: "ID de ticket GLPI (solo número)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy_qa:
+    name: Gate manual QA
+    runs-on: ubuntu-latest
+    environment:
+      name: qa
+    steps:
+      - name: Validar referencia permitida para QA
+        run: |
+          REF_INPUT="${{ github.event.inputs.ref }}"
+          if [[ "$REF_INPUT" == "develop" || "$REF_INPUT" =~ ^release/.+ ]]; then
+            echo "Referencia válida para QA: $REF_INPUT"
+            exit 0
+          fi
+          echo "Referencia no permitida para QA: $REF_INPUT"
+          echo "Use develop o release/*"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Registro de gate QA
+        run: |
+          echo "Gate manual QA aprobado para ref: ${{ github.event.inputs.ref }}"
+          echo "Ticket GLPI: GLPI-${{ github.event.inputs.glpi_ticket }}"
+          echo "Pendiente de iteraciones posteriores: integrar despliegue real (SQLcl/ORDS)."

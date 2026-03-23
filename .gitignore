@@ -1,0 +1,28 @@
+# Secretos y entornos locales (nunca versionar valores reales)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!*.example
+
+# Node / TypeScript (MCP y herramientas)
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.npmrc
+
+# IDE y sistema
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Oracle / SQLcl artefactos locales
+*.dmp
+*.log
+apex_exports_temp/
+
+# Volúmenes Docker enlazados por error
+infra/volumes/data/

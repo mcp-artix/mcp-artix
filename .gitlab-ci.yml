@@ -1,0 +1,133 @@
+# GitLab CI — plataforma empornac-ai-dev-platform
+# Válido en GitLab CE/EE en servidor dedicado, GitLab.com u otra instancia autohospedada.
+# Runners deben tener la etiqueta "docker" (o ajustar default.tags abajo).
+# Stages: validate → export_apex → package → deploy_* (QA/PROD manual)
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+stages:
+  - validate
+  - export_apex
+  - package
+  - deploy_dev
+  - deploy_qa
+  - deploy_prod
+
+variables:
+  GIT_DEPTH: "50"
+
+default:
+  tags:
+    - docker
+
+validate:branch:
+  stage: validate
+  image: alpine:3.19
+  script:
+    - apk add --no-cache bash git >/dev/null
+    - bash ci/scripts/validate-branch-name.sh "$CI_COMMIT_REF_NAME"
+
+validate:commit_messages:
+  stage: validate
+  image: alpine:3.19
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+  script:
+    - apk add --no-cache bash git >/dev/null
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --depth=50
+    - |
+      for c in $(git rev-list "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME..$CI_COMMIT_SHA"); do
+        MSG=$(git log -1 --format=%s "$c")
+        echo "$MSG" | bash ci/scripts/validate-commit-message.sh || exit 1
+      done
+
+validate:repo_structure:
+  stage: validate
+  image: alpine:3.19
+  script:
+    - apk add --no-cache bash >/dev/null
+    - bash ci/scripts/validate-repo-structure.sh .
+
+validate:bash_syntax:
+  stage: validate
+  image: alpine:3.19
+  script:
+    - apk add --no-cache bash >/dev/null
+    - bash -n scripts/init-lab.sh
+    - bash -n ci/scripts/validate-branch-name.sh
+    - bash -n ci/scripts/validate-commit-message.sh
+    - bash -n ci/scripts/validate-repo-structure.sh
+    - bash -n ci/scripts/validate-local.sh
+    - bash -n scripts/github/preflight-github.sh
+    - bash -n scripts/github/bootstrap-local.sh
+    - bash -n scripts/laboratorio/start-minimo.sh
+    - bash -n scripts/laboratorio/validar-salud.sh
+
+validate:mcp_build:
+  stage: validate
+  image: node:22-alpine
+  script:
+    - cd mcp/oracle-apex && npm ci && npm run build
+    - cd ../glpi && npm ci && npm run build
+
+export_apex:
+  stage: export_apex
+  image: alpine:3.19
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/.+/'
+      when: manual
+  script:
+    - echo "STUB — requiere imagen con SQLcl y variables ORACLE_* en GitLab."
+    - echo "Cuando esté listo: sqlcl + apex export -applicationid ... -split"
+  artifacts:
+    paths:
+      - apex/exports/
+    expire_in: 1 week
+  allow_failure: true
+
+package:
+  stage: package
+  image: alpine:3.19
+  needs: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+  script:
+    - mkdir -p dist apex/exports
+    - tar czvf dist/apex-exports-${CI_COMMIT_SHORT_SHA}.tar.gz apex/exports
+  artifacts:
+    paths:
+      - dist/
+
+deploy_dev:
+  stage: deploy_dev
+  image: alpine:3.19
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+  script:
+    - echo "Despliegue manual a DEV — integrar scripts institucionales (sqlcl, ORDS, etc.)."
+
+deploy_qa:
+  stage: deploy_qa
+  image: alpine:3.19
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/.+/'
+      when: manual
+  script:
+    - echo "Despliegue manual a QA — requiere artefacto validado y ticket GLPI en estado de prueba."
+
+deploy_prod:
+  stage: deploy_prod
+  image: alpine:3.19
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  script:
+    - echo "Despliegue manual a PROD — solo tras aprobación de cambio y doble control."
+  # En GitLab: configurar "protected environments" y aprobadores para este job.

@@ -1,0 +1,7 @@
+{
+  "comentario": "Opcional: sustituir lectura desde JSON en futuras versiones; hoy se usan variables de entorno.",
+  "oracle": {
+    "soloLectura": true
+  },
+  "herramientasDeshabilitadas": []
+}
