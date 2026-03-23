@@ -1,4 +1,5 @@
 name: Deploy PROD (Manual Puente)
+# Ajuste GLPI-2: cambio mínimo para forzar reindexación del workflow en GitHub Actions.
 
 on:
   workflow_dispatch:
